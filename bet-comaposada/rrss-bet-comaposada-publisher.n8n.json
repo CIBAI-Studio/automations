@@ -1,0 +1,477 @@
+{
+  "name": "RRSS Publisher — Bet Comaposada",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Cron — Cada hora",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.BET_COMAPOSADA_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Estado",
+              "lookupValue": "programat"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "read-sheet",
+      "name": "Llegir Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [460, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "{{ $env.GOOGLE_SHEETS_CREDENTIAL_ID }}",
+          "name": "Google Sheets — CIBAI Studio"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $now.format('yyyy-MM-dd') }}",
+              "rightValue": "={{ $json.Fecha }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{ $now.format('HH:mm') }}",
+              "rightValue": "={{ $json.Hora }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "filter-datetime",
+      "name": "Filtre Data/Hora",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json['Red Social'] }}",
+                    "rightValue": "instagram",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "instagram"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json['Red Social'] }}",
+                    "rightValue": "facebook",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "facebook"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "router-rrss",
+      "name": "Router RRSS",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/{{ $env.BET_INSTAGRAM_ACCOUNT_ID }}/media",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "caption",
+              "value": "={{ $json.Caption + '\\n\\n' + $json.Hashtags }}"
+            },
+            {
+              "name": "image_url",
+              "value": "={{ $json['URL Media'] }}"
+            },
+            {
+              "name": "media_type",
+              "value": "={{ $json.Tipo === 'reel' ? 'REELS' : ($json.Tipo === 'carrusel' ? 'CAROUSEL' : 'IMAGE') }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.BET_INSTAGRAM_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "instagram-create-container",
+      "name": "Instagram — Crear Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/{{ $env.BET_INSTAGRAM_ACCOUNT_ID }}/media_publish",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.BET_INSTAGRAM_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "instagram-publish",
+      "name": "Instagram — Publicar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/{{ $env.BET_FACEBOOK_PAGE_ID }}/feed",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message",
+              "value": "={{ $json.Caption + '\\n\\n' + $json.Hashtags }}"
+            },
+            {
+              "name": "link",
+              "value": "={{ $json['URL Link'] }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.BET_FACEBOOK_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "facebook-publish",
+      "name": "Facebook — Publicar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 440]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.BET_COMAPOSADA_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Estado": "publicat"
+          },
+          "matchingColumns": ["ID"],
+          "schema": [
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Estado",
+              "displayName": "Estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "update-estado-ok",
+      "name": "Actualitzar Estado: publicat",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1560, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "{{ $env.GOOGLE_SHEETS_CREDENTIAL_ID }}",
+          "name": "Google Sheets — CIBAI Studio"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.BET_COMAPOSADA_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Estado": "error",
+            "Notas": "={{ $json.Notas + ' | ERROR: ' + $runIndex }}"
+          },
+          "matchingColumns": ["ID"],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "update-estado-error",
+      "name": "Actualitzar Estado: error",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1560, 500],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "{{ $env.GOOGLE_SHEETS_CREDENTIAL_ID }}",
+          "name": "Google Sheets — CIBAI Studio"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "clientes@cibai.studio",
+        "toEmail": "={{ $env.CM_EMAIL }}",
+        "subject": "⚠️ Error publicació RRSS — Bet Comaposada",
+        "emailType": "html",
+        "message": "<h2>Error en publicació</h2><p><strong>ID:</strong> {{ $json.ID }}</p><p><strong>Plataforma:</strong> {{ $json['Red Social'] }}</p><p><strong>Data:</strong> {{ $json.Fecha }} {{ $json.Hora }}</p><p><strong>Error:</strong> {{ $json.error }}</p>",
+        "options": {}
+      },
+      "id": "notify-error",
+      "name": "Notificar Error CM",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1780, 500],
+      "credentials": {
+        "smtp": {
+          "id": "{{ $env.SMTP_CREDENTIAL_ID }}",
+          "name": "SMTP — CIBAI Studio"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## RRSS Publisher — Bet Comaposada\n\n**Trigger:** Cada hora\n**Variables de entorno requerides:**\n- `BET_COMAPOSADA_SHEET_ID` — ID del Google Sheet\n- `BET_INSTAGRAM_ACCOUNT_ID` — ID compte Instagram de Bet\n- `BET_INSTAGRAM_ACCESS_TOKEN` — Token Instagram\n- `BET_FACEBOOK_PAGE_ID` — ID pàgina Facebook de Bet\n- `BET_FACEBOOK_ACCESS_TOKEN` — Token Facebook\n- `GOOGLE_SHEETS_CREDENTIAL_ID` — ID credencial N8N per Google Sheets\n- `SMTP_CREDENTIAL_ID` — ID credencial SMTP per notificacions\n- `CM_EMAIL` — Email Community Manager per notificacions d'error\n\n**Flux:**\n1. Llegeix el Google Sheet filtrant `Estado = programat`\n2. Filtra files que corresponen a la data/hora actual\n3. Ruteig per plataforma (Instagram / Facebook)\n4. Publica a la xarxa social corresponent via API Meta\n5. Actualitza `Estado` a `publicat` o `error` al Sheet\n6. Envia email de notificació si hi ha errors",
+        "height": 400,
+        "width": 500
+      },
+      "id": "annotation",
+      "name": "Documentació del Flow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, 560]
+    }
+  ],
+  "connections": {
+    "Cron — Cada hora": {
+      "main": [
+        [
+          {
+            "node": "Llegir Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Llegir Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Filtre Data/Hora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtre Data/Hora": {
+      "main": [
+        [
+          {
+            "node": "Router RRSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router RRSS": {
+      "main": [
+        [
+          {
+            "node": "Instagram — Crear Container",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Facebook — Publicar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram — Crear Container": {
+      "main": [
+        [
+          {
+            "node": "Instagram — Publicar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram — Publicar": {
+      "main": [
+        [
+          {
+            "node": "Actualitzar Estado: publicat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook — Publicar": {
+      "main": [
+        [
+          {
+            "node": "Actualitzar Estado: publicat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "cibai-studio"
+  },
+  "pinData": {},
+  "versionId": "1.0.0",
+  "triggerCount": 0,
+  "tags": [
+    {
+      "createdAt": "2026-05-19T00:00:00.000Z",
+      "updatedAt": "2026-05-19T00:00:00.000Z",
+      "id": "bet-comaposada",
+      "name": "bet-comaposada"
+    },
+    {
+      "createdAt": "2026-05-19T00:00:00.000Z",
+      "updatedAt": "2026-05-19T00:00:00.000Z",
+      "id": "rrss",
+      "name": "rrss"
+    }
+  ]
+}
